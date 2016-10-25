@@ -12,6 +12,7 @@
 #define METERS_TO_PIXELS(m) ((int) floor(PIXELS_PER_METER * m))
 #define PIXEL_TO_METERS(p)  ((float) METER_PER_PIXEL * p)
 
+
 // Small class to return to other modules to track position and rotation of physics bodies
 class PhysBody
 {
@@ -28,6 +29,7 @@ public:
 	int width, height;
 	b2Body* body;
 	Module* listener;
+
 };
 
 // Module --------------------------------------
@@ -42,10 +44,12 @@ public:
 	update_status PostUpdate();
 	bool CleanUp();
 
-	PhysBody* CreateCircle(int x, int y, int radius);
-	PhysBody* CreateRectangle(int x, int y, int width, int height);
+	PhysBody* CreateCircle(int x, int y, int radius, b2BodyType type);
+	PhysBody* CreateFlipper(int x, int y, int* points);
 	PhysBody* CreateRectangleSensor(int x, int y, int width, int height);
-	PhysBody* CreateChain(int x, int y, int* points, int size, b2BodyType body_type);
+	PhysBody* CreateChain(int x, int y, int* points, int size, b2BodyType type);
+
+	b2RevoluteJoint* CreateJoint(PhysBody* A, PhysBody* B, b2Vec2 anchor_A, b2Vec2 anchor_B);
 
 	// b2ContactListener ---
 	void BeginContact(b2Contact* contact);
@@ -56,4 +60,5 @@ private:
 	b2World* world;
 	b2MouseJoint* mouse_joint;
 	b2Body* ground;
+	b2Vec2 mouse_position;
 };

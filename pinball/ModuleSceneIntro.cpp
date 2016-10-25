@@ -9,9 +9,11 @@
 
 ModuleSceneIntro::ModuleSceneIntro(Application* app, bool start_enabled) : Module(app, start_enabled)
 {
-	circle = box = background = NULL;
+	circle = ball_tex = background = NULL;
+	ball = NULL;
 	ray_on = false;
 	sensed = false;
+	score = 0;
 }
 
 ModuleSceneIntro::~ModuleSceneIntro()
@@ -25,15 +27,18 @@ bool ModuleSceneIntro::Start()
 
 	App->renderer->camera.x = App->renderer->camera.y = 0;
 
-	circle = App->textures->Load("pinball/ball.png"); 
-	box = App->textures->Load("pinball/crate.png");
+	circle = App->textures->Load("pinball/wheel.png"); 
+	ball_tex = App->textures->Load("pinball/ball.png");
 	background = App->textures->Load("pinball/background.png");
-	bonus_fx = App->audio->LoadFx("pinball/bonus.wav");
+	flipper_fx = App->audio->LoadFx("pinball/Flipper_fx.wav");
+	triangle_fx = App->audio->LoadFx("pinball/triangle_fx.wav");
+	bumper_fx = App->audio->LoadFx("pinball/bumper_fx.wav");
+
+	App->audio->PlayMusic("pinball/pinballmusic.ogg");
 
 	sensor = App->physics->CreateRectangleSensor(SCREEN_WIDTH / 2, SCREEN_HEIGHT, SCREEN_WIDTH, 50);
 
-	chains.add(App->physics->CreateChain(0, 0, pinball, 338, b2BodyType::b2_staticBody));
-	
+	LoadMap();
 
 	return ret;
 }
@@ -58,19 +63,50 @@ update_status ModuleSceneIntro::Update()
 
 	if(App->input->GetKey(SDL_SCANCODE_1) == KEY_DOWN)
 	{
-		circles.add(App->physics->CreateCircle(App->input->GetMouseX(), App->input->GetMouseY(), 25));
-		circles.getLast()->data->listener = this;
+
+		ball = App->physics->CreateCircle(App->input->GetMouseX(), App->input->GetMouseY(), 10, b2BodyType::b2_dynamicBody);
+		ball->listener = this;
+		
 	}
 
-	if(App->input->GetKey(SDL_SCANCODE_2) == KEY_DOWN)
+	if (App->input->GetKey(SDL_SCANCODE_LEFT) == KEY_REPEAT)
 	{
-		boxes.add(App->physics->CreateRectangle(App->input->GetMouseX(), App->input->GetMouseY(), 100, 50));
+
+		left_joint->EnableMotor(true);
+		left_joint->SetMaxMotorTorque(100);
+		left_joint->SetMotorSpeed(-800 * DEGTORAD);
+
 	}
 
-	if(App->input->GetKey(SDL_SCANCODE_3) == KEY_DOWN)
+	if (App->input->GetKey(SDL_SCANCODE_LEFT) == KEY_UP)
 	{
-		circles.add(App->physics->CreateCircle(App->input->GetMouseX(), App->input->GetMouseY(), 10));
-		circles.getLast()->data->listener = this;
+		left_joint->SetMotorSpeed(800 * DEGTORAD);
+	}
+
+	if (App->input->GetKey(SDL_SCANCODE_LEFT) == KEY_DOWN)
+	{
+		App->audio->PlayFx(flipper_fx);
+
+
+	}
+
+	if (App->input->GetKey(SDL_SCANCODE_RIGHT) == KEY_REPEAT)
+	{
+
+		right_joint->EnableMotor(true);
+		right_joint->SetMaxMotorTorque(100);
+		right_joint->SetMotorSpeed(800 * DEGTORAD);
+
+	}
+
+	if (App->input->GetKey(SDL_SCANCODE_RIGHT) == KEY_UP)
+	{
+		right_joint->SetMotorSpeed(-800 * DEGTORAD);
+	}
+
+	if (App->input->GetKey(SDL_SCANCODE_RIGHT) == KEY_DOWN)
+	{
+		App->audio->PlayFx(flipper_fx);
 	}
 
 	// Prepare for raycast ------------------------------------------------------
@@ -83,45 +119,13 @@ update_status ModuleSceneIntro::Update()
 	fVector normal(0.0f, 0.0f);
 
 	// All draw functions ------------------------------------------------------
-	p2List_item<PhysBody*>* c = chains.getFirst();
 
-	while (c != NULL)
-	{
-		int x, y;
-		c->data->GetPosition(x, y);
-		App->renderer->Blit(background, x, y, NULL, 1.0f, c->data->GetRotation());
-		c = c->next;
+	App->renderer->Blit(background, 0, 0);
+	if (ball) {
+		int ballx, bally;
+		ball->GetPosition(ballx, bally);
+		App->renderer->Blit(ball_tex, ballx, bally);
 	}
-
-	c = circles.getFirst();
-
-	while(c != NULL)
-	{
-		int x, y;
-		c->data->GetPosition(x, y);
-		if(c->data->Contains(App->input->GetMouseX(), App->input->GetMouseY()))
-			App->renderer->Blit(circle, x, y, NULL, 1.0f, c->data->GetRotation());
-		c = c->next;
-	}
-
-	c = boxes.getFirst();
-
-	while(c != NULL)
-	{
-		int x, y;
-		c->data->GetPosition(x, y);
-		App->renderer->Blit(box, x, y, NULL, 1.0f, c->data->GetRotation());
-		if(ray_on)
-		{
-			int hit = c->data->RayCast(ray.x, ray.y, mouse.x, mouse.y, normal.x, normal.y);
-			if(hit >= 0)
-				ray_hit = hit;
-		}
-		c = c->next;
-	}
-
-	c = ricks.getFirst();
-
 
 
 
@@ -145,8 +149,39 @@ void ModuleSceneIntro::OnCollision(PhysBody* bodyA, PhysBody* bodyB)
 {
 	int x, y;
 
-	App->audio->PlayFx(bonus_fx);
+	if (bodyA == ball) {
 
+		//App->audio->PlayFx(flipper_fx);
+
+
+		int index = bumpers.find(bodyB);
+		if (index != -1) {
+
+			App->audio->PlayFx(bumper_fx);
+
+			score += 100;
+
+			b2Vec2 bouncing_force;
+			bouncing_force.x = bodyA->body->GetPosition().x - bodyB->body->GetPosition().x;
+			bouncing_force.y = bodyA->body->GetPosition().y - bodyB->body->GetPosition().y;
+			bouncing_force.x *= 1.5;
+			bouncing_force.y *= 1.5;
+			bodyA->body->ApplyLinearImpulse(bouncing_force, bodyA->body->GetLocalCenter(), true);
+		}
+		else if (bodyB == left_bouncer) {
+			b2Vec2 bouncing_force;
+			bouncing_force.Set(0.75, -1.25);
+			bodyA->body->ApplyLinearImpulse(bouncing_force, bodyA->body->GetLocalCenter(), true);
+			App->audio->PlayFx(triangle_fx);
+		}
+
+		else if (bodyB == right_bouncer) {
+			b2Vec2 bouncing_force;
+			bouncing_force.Set(-0.75, -1.25);
+			bodyA->body->ApplyLinearImpulse(bouncing_force, bodyA->body->GetLocalCenter(), true);
+		}
+
+	}
 	/*
 	if(bodyA)
 	{
@@ -159,4 +194,39 @@ void ModuleSceneIntro::OnCollision(PhysBody* bodyA, PhysBody* bodyB)
 		bodyB->GetPosition(x, y);
 		App->renderer->DrawCircle(x, y, 50, 100, 100, 100);
 	}*/
+}
+
+void ModuleSceneIntro::LoadMap() {
+
+	chains.add(App->physics->CreateChain(0, 0, pinball, 338, b2BodyType::b2_staticBody));
+	chains.add(App->physics->CreateChain(0, 0, bottom_right, 38, b2BodyType::b2_staticBody));
+	chains.add(App->physics->CreateChain(0, 0, bottom_left, 46, b2BodyType::b2_staticBody));
+
+	chains.add(App->physics->CreateChain(0, 0, bouncer_block_right, 14, b2BodyType::b2_staticBody));
+	chains.add(App->physics->CreateChain(0, 0, bouncer_block_left, 28, b2BodyType::b2_staticBody));
+
+	left_bouncer = App->physics->CreateChain(93, 638, bouncer_left, 8, b2BodyType::b2_staticBody);
+
+	flippers.add(App->physics->CreateFlipper(129, 746, left_flipper));
+	joint_anchors.add(App->physics->CreateCircle(129, 746, 10, b2BodyType::b2_staticBody));
+
+	b2Vec2 left_anchor(-0.2, -0.15);
+	b2Vec2 left_flipper_anchor(0, 0);
+	left_joint = App->physics->CreateJoint(joint_anchors.getLast()->data, flippers.getLast()->data, left_anchor, left_flipper_anchor);
+
+	flippers.add(App->physics->CreateFlipper(324, 746, right_flipper));
+	joint_anchors.add(App->physics->CreateCircle(319, 746, 10, b2BodyType::b2_staticBody));
+
+	b2Vec2 right_anchor(0.2, -0.15);
+	b2Vec2 right_flipper_anchor(0, 0);
+	right_joint = App->physics->CreateJoint(joint_anchors.getLast()->data, flippers.getLast()->data, right_anchor, right_flipper_anchor);
+
+
+	bumpers.add(App->physics->CreateCircle(199, 224, 24, b2BodyType::b2_staticBody));
+	bumpers.add(App->physics->CreateCircle(283, 220, 30, b2BodyType::b2_staticBody));
+	bumpers.add(App->physics->CreateCircle(283, 315, 40, b2BodyType::b2_staticBody));
+	bumpers.add(App->physics->CreateCircle(190, 302, 30, b2BodyType::b2_staticBody));
+
+
+
 }

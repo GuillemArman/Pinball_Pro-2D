@@ -5,6 +5,7 @@
 #include "Globals.h"
 
 class PhysBody;
+class b2RevoluteJoint;
 
 class ModuleSceneIntro : public Module
 {
@@ -16,22 +17,148 @@ public:
 	update_status Update();
 	bool CleanUp();
 	void OnCollision(PhysBody* bodyA, PhysBody* bodyB);
+	void LoadMap();
 
 public:
-	p2List<PhysBody*> circles;
-	p2List<PhysBody*> boxes;
-	p2List<PhysBody*> ricks;
+
+	uint score;
+
+	PhysBody* ball;
+	b2RevoluteJoint* left_joint;
+	b2RevoluteJoint* right_joint;
+
+	p2List<PhysBody*> bumpers;
+	p2List<PhysBody*> flippers;
+	p2List<PhysBody*> joint_anchors;
 	p2List<PhysBody*> chains;
+
+	PhysBody* left_bouncer;
+	PhysBody* right_bouncer;
 
 	PhysBody* sensor;
 	bool sensed;
 
 	SDL_Texture* circle;
-	SDL_Texture* box;
+	SDL_Texture* ball_tex;
 	SDL_Texture* background;
-	uint bonus_fx;
+	uint flipper_fx;
+	uint triangle_fx;
+	uint bumper_fx;
+
 	p2Point<int> ray;
 	bool ray_on;
+
+
+
+	int left_flipper[16] = {
+		10, 19,
+		73, 48,
+		83, 48,
+		84, 42,
+		79, 36,
+		17, 1,
+		5, 2,
+		1, 11
+	};
+
+	int right_flipper[16] = {
+		-10, 19,
+		-73, 48,
+		-83, 48,
+		-84, 42,
+		-79, 36,
+		-17, 1,
+		-5, 2,
+		-1, 11
+	};
+
+	int bouncer_block_right[14] = {
+		320, 693,
+		355, 620,
+		365, 615,
+		370, 618,
+		373, 623,
+		374, 681,
+		325, 702
+	};
+
+
+	// Pivot 0, 0
+	int bouncer_block_left[28] = {
+		110, 680,
+		120, 682,
+		125, 694,
+		124, 701,
+		110, 697,
+		84, 682,
+		79, 679,
+		76, 671,
+		75, 627,
+		79, 621,
+		86, 618,
+		92, 622,
+		98, 632,
+		93, 638
+	};
+
+	int bouncer_left[8] = {
+		5, -6,
+		0, 0,
+		17, 22,
+		27, 42,
+	};
+
+
+
+
+	int bottom_left[46] = {
+		39, 631,
+		45, 630,
+		48, 634,
+		48, 647,
+		48, 660,
+		48, 673,
+		48, 685,
+		55, 694,
+		63, 698,
+		78, 706,
+		96, 718,
+		111, 729,
+		122, 734,
+		120, 740,
+		118, 744,
+		107, 737,
+		86, 724,
+		69, 714,
+		54, 704,
+		45, 698,
+		39, 685,
+		38, 664,
+		38, 643
+	};
+
+
+	int bottom_right[38] = {
+		338, 731,
+		390, 698,
+		396, 694,
+		401, 688,
+		401, 680,
+		401, 657,
+		402, 639,
+		405, 635,
+		410, 637,
+		411, 658,
+		411, 681,
+		410, 688,
+		408, 695,
+		402, 703,
+		394, 707,
+		358, 730,
+		338, 741,
+		329, 747,
+		324, 740
+	};
 
 
 	int pinball[338] = {
